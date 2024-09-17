@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SimpleX Chat Address Decoder</title>
+<style type="text/css">
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+h1 {
+    font-size: 1.5em;
+    text-align: center;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    font-size: 1em;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    box-sizing: border-box;
+}
+
+button {
+    padding: 12px;
+    font-size: 1em;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #218838;
+}
+
+#output {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    box-sizing: border-box;
+    word-wrap: break-word;
+    font-size: 1.2em;
+}
+
+ul {
+    padding-left: 20px;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    h1 {
+        font-size: 1.3em;
+    }
+
+    input[type="text"], button {
+        font-size: 0.9em;
+        padding: 10px;
+    }
+
+    #output {
+        padding: 10px;
+    }
+}
+
+@media (max-width: 400px) {
+    input[type="text"] {
+        font-size: 0.8em;
+        padding: 8px;
+    }
+
+    button {
+        font-size: 0.8em;
+        padding: 8px;
+    }
+}
+</style>
+</head>
+<body>
+
+<h1>SimpleX Chat Address Decoder</h1>
+
+<form id="urlForm">
+    <input type="text" id="urlInput" placeholder="https://simplex.chat/contact#/?v=..." style="width: 100%;">
+    <button type="submit">Decode</button>
+</form>
+
+<div id="output"></div>
+
+<script>
+
+
+    function decodeRecursively(value) {
+        let decodedValue = decodeURIComponent(value);
+
+        while (decodedValue !== value) {
+            value = decodedValue;
+            decodedValue = decodeURIComponent(value);
+        }
+        return decodedValue;
+    }
+
+
+    function decodeUrlParameters(url) {
+        let params = new URLSearchParams(url.split('?')[1]);
+        let decodedParams = {};
+        params.forEach((value, key) => {
+            if (key === 'smp') {
+
+                decodedParams[key] = decodeRecursively(value);
+
+                decodedParams[key] = decodeSmpParameters(decodedParams[key]);
+            } else {
+                decodedParams[key] = decodeRecursively(value);
+            }
+        });
+        return decodedParams;
+    }
+
+    function paramsToObject(entries) {
+      const result = {}
+      for(const [key, value] of entries) {
+        result[key] = value;
+      }
+      return result;
+    }
+
+
+    function decodeSmpParameters(smpValue) {
+
+        if (smpValue.startsWith('smp://')) {
+            let url = smpValue.slice(6);
+            let parts = url.split('@');
+            let userInfo = parts[0];
+            let hostAndPath = parts[1];
+
+            let decodedUserInfo = decodeRecursively(userInfo);
+            let decodedHostAndPath = decodeRecursively(hostAndPath);
+
+
+            let userInfoParts = decodedUserInfo.split(':');
+            let hostname = decodedHostAndPath.split('/')[0];
+            let path = decodedHostAndPath.slice(hostname.length);
+
+
+            let [subhost, p] = decodedHostAndPath.split('#')
+            let subpath = decodeRecursively(new URLSearchParams(p)).slice(1)
+
+            return {
+                username: userInfoParts[0],
+                password: userInfoParts[1],
+                hostname,
+                //subhost,
+                path: '/'+subhost.split('/')[1],
+                params: paramsToObject((new URLSearchParams(subpath)).entries())
+            };
+        }
+
+
+        try {
+            let smpParams = new URLSearchParams(smpValue);
+            let smpDecoded = {};
+            smpParams.forEach((value, key) => {
+                smpDecoded[key] = decodeRecursively(value);
+            });
+            return smpDecoded;
+        } catch (e) {
+            return smpValue;
+        }
+    }
+
+ function createTree(obj) {
+        const ul = document.createElement('ul');
+
+        for (let key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                const li = document.createElement('li');
+
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    li.innerHTML = `<b class="key">${key}:</b>`;
+                    li.appendChild(createTree(obj[key]));
+                } else {
+
+                    li.innerHTML = `<b class="key">${key}:</b> <span class="value">${obj[key]}</span>`;
+                }
+
+                ul.appendChild(li);
+            }
+        }
+
+        return ul;
+    }
+
+    document.getElementById('urlForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        let urlInput = document.getElementById('urlInput').value;
+        let decodedParams = decodeUrlParameters(urlInput);
+
+        let outputDiv = document.getElementById('output');
+         outputDiv.appendChild( createTree(decodedParams) )
+    });
+</script>
+
+</body>
+</html>
